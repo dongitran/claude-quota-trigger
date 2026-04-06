@@ -17,12 +17,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js with npm 11 via corepack
         uses: actions/setup-node@v4
         with:
-          # Trusted publisher uses OIDC — no registry-url needed here
           node-version: 22.x
           cache: npm
+          # Trusted publisher uses OIDC — no registry-url needed
+
+      - name: Upgrade npm to 11.x (trusted publisher requires npm ≥ 11.5.1)
+        # Use corepack to avoid the MODULE_NOT_FOUND issue with npm install -g
+        run: |
+          corepack enable
+          corepack prepare npm@11.5.1 --activate
+          npm --version
 
       - name: Install dependencies
         run: npm ci
@@ -32,9 +39,6 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Show npm version (must be ≥ 11.5.1 for trusted publishing)
-        run: npm --version
 
       - name: Publish with provenance (trusted publisher — no token needed)
         run: npm publish --provenance --access public
