@@ -23,7 +23,7 @@ jobs:
           node-version: 24.x
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run all checks
         run: npm run check
