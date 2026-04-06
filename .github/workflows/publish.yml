@@ -20,12 +20,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
+          # Trusted publisher uses OIDC — no registry-url needed here
           node-version: 22.x
           cache: npm
-          # Note: no registry-url here — trusted publisher uses OIDC, not token
-
-      - name: Upgrade npm (trusted publisher requires npm ≥ 11.5.1)
-        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
@@ -35,6 +32,9 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Show npm version (must be ≥ 11.5.1 for trusted publishing)
+        run: npm --version
 
       - name: Publish with provenance (trusted publisher — no token needed)
         run: npm publish --provenance --access public
