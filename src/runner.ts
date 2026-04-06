@@ -4,29 +4,29 @@
  * Also handles --regenerate (midnight job to refresh random minutes).
  */
 
-import { appendFileSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import {
   generateRandomMinutes,
+  getLogPath,
   loadConfig,
   saveConfig,
 } from "./core/config.js";
 import { installCronJobs } from "./core/scheduler.js";
 import { sendTrigger } from "./core/trigger-runner.js";
 
-const LOG_DIR = join(homedir(), ".config", "cqt");
-const LOG_PATH = join(LOG_DIR, "trigger.log");
+const LOG_PATH = getLogPath();
 
 function log(message: string): void {
   const timestamp = new Date().toISOString();
   const line = `[${timestamp}] ${message}\n`;
 
-  if (!existsSync(LOG_DIR)) {
-    mkdirSync(LOG_DIR, { recursive: true });
+  try {
+    mkdirSync(dirname(LOG_PATH), { recursive: true });
+    appendFileSync(LOG_PATH, line, "utf-8");
+  } catch {
+    // Log directory not writable — silently skip
   }
-
-  appendFileSync(LOG_PATH, line, "utf-8");
 }
 
 function regenerate(): void {

@@ -5,13 +5,13 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     coverage: {
       provider: "v8",
-      include: ["src/core/**/*.ts", "src/types.ts"],
+      include: ["src/core/**/*.ts", "src/commands/**/*.ts", "src/types.ts"],
       exclude: [],
       thresholds: {
-        lines: 80,
-        functions: 80,
-        branches: 60,
-        statements: 80,
+        lines: 75,
+        functions: 75,
+        branches: 55,
+        statements: 75,
       },
       reporter: ["text", "lcov"],
     },

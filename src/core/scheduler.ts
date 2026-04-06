@@ -1,34 +1,56 @@
 import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { CqtConfig, ScheduleStatus, TriggerEntry } from "../types.js";
 import { CRON_MARKER_BEGIN, CRON_MARKER_END } from "../types.js";
+
+// Node 20-compatible __dirname (import.meta.dirname is Node 21.2+)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 function getNodeBin(): string {
   return process.execPath;
 }
 
+/**
+ * Resolves path to the cqt-runner script.
+ * After `npm install -g`, dist/cli.js and dist/runner.js are siblings.
+ */
 function getCqtRunnerBin(): string {
-  // Resolve to the installed cqt-runner binary
-  const localRunner = join(import.meta.dirname, "..", "runner.js");
-  const globalRunner = join(import.meta.dirname, "runner.js");
-
-  if (existsSync(localRunner)) return localRunner;
-  if (existsSync(globalRunner)) return globalRunner;
-  // Fallback: assume installed globally alongside this script
-  return join(import.meta.dirname, "runner.js");
+  const siblingRunner = join(__dirname, "runner.js");
+  if (existsSync(siblingRunner)) return siblingRunner;
+  return "cqt-runner"; // Fallback to PATH
 }
 
 function readCurrentCrontab(): string {
   try {
-    return execSync("crontab -l 2>/dev/null", { encoding: "utf-8" });
-  } catch {
+    return execSync("crontab -l", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
+  } catch (err) {
+    // Exit code 1 = no crontab for user (normal); anything else is a real error
+    const code = (err as NodeJS.ErrnoException & { status?: number }).status;
+    if (code !== undefined && code !== 1) {
+      throw new Error(`Failed to read crontab (exit ${String(code)}): ${String(err)}`, { cause: err });
+    }
     return "";
   }
 }
 
+/**
+ * Writes crontab content using a temp file to avoid shell injection risk.
+ * Never use `echo "..." | crontab -` — shell escaping is fragile.
+ */
 function writeCurrentCrontab(content: string): void {
-  execSync(`echo ${JSON.stringify(content)} | crontab -`, { encoding: "utf-8" });
+  const tmpFile = join(tmpdir(), `cqt-crontab-${String(Date.now())}.tmp`);
+  try {
+    writeFileSync(tmpFile, content, "utf-8");
+    execSync(`crontab ${tmpFile}`, { encoding: "utf-8" });
+  } finally {
+    if (existsSync(tmpFile)) {
+      rmSync(tmpFile);
+    }
+  }
 }
 
 function stripCqtSection(crontab: string): string {
@@ -53,31 +75,33 @@ function stripCqtSection(crontab: string): string {
   return result.join("\n").replace(/\n{3,}/g, "\n\n");
 }
 
+/**
+ * Builds a platform-aware PATH string for the cron environment.
+ * Cron runs with a minimal PATH — we must supply what we need.
+ */
+function buildCronPath(): string {
+  const base = ["/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"];
+  if (process.platform === "darwin") {
+    return ["/opt/homebrew/bin", "/opt/homebrew/sbin", ...base].join(":");
+  }
+  // Linux (also handles Linuxbrew)
+  return ["/home/linuxbrew/.linuxbrew/bin", ...base].join(":");
+}
+
 function buildCronSection(config: CqtConfig): string {
   const nodeBin = getNodeBin();
   const runnerBin = getCqtRunnerBin();
-
-  // PATH needed in cron environment (homebrew + standard paths)
-  const pathLine =
-    "PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/opt/homebrew/sbin:/usr/sbin:/sbin";
+  const pathLine = `PATH=${buildCronPath()}`;
 
   const triggerLines = config.triggerHours.map((hour, idx) => {
     const minute = config.randomMinutes[idx] ?? 1;
     return `${String(minute)} ${String(hour)} * * * ${nodeBin} ${runnerBin} 2>/dev/null`;
   });
 
-  // Midnight job to regenerate random minutes daily
+  // Midnight job regenerates random minutes daily
   const regenLine = `0 0 * * * ${nodeBin} ${runnerBin} --regenerate 2>/dev/null`;
 
-  const lines = [
-    CRON_MARKER_BEGIN,
-    pathLine,
-    ...triggerLines,
-    regenLine,
-    CRON_MARKER_END,
-  ];
-
-  return lines.join("\n");
+  return [CRON_MARKER_BEGIN, pathLine, ...triggerLines, regenLine, CRON_MARKER_END].join("\n");
 }
 
 export function installCronJobs(config: CqtConfig): void {
@@ -98,7 +122,11 @@ export function uninstallCronJobs(): void {
   const cleaned = stripped.trim();
 
   if (cleaned.length === 0) {
-    execSync("crontab -r 2>/dev/null || true", { encoding: "utf-8" });
+    try {
+      execSync("crontab -r", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
+    } catch {
+      // No crontab to remove — silently ignore
+    }
   } else {
     writeCurrentCrontab(cleaned + "\n");
   }

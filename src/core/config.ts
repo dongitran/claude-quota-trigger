@@ -1,11 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { homedir } from "node:os";
 import type { CqtConfig } from "../types.js";
 import { DEFAULT_CONFIG } from "../types.js";
 
 const CONFIG_DIR = join(homedir(), ".config", "cqt");
 const CONFIG_PATH = join(CONFIG_DIR, "config.json");
+const LOG_PATH = join(CONFIG_DIR, "trigger.log");
 
 function ensureConfigDir(): void {
   if (!existsSync(CONFIG_DIR)) {
@@ -15,6 +16,10 @@ function ensureConfigDir(): void {
 
 export function getConfigPath(): string {
   return CONFIG_PATH;
+}
+
+export function getLogPath(): string {
+  return LOG_PATH;
 }
 
 export function loadConfig(): CqtConfig {
@@ -33,10 +38,6 @@ export function loadConfig(): CqtConfig {
 
 export function saveConfig(config: CqtConfig): void {
   ensureConfigDir();
-  const dirPath = dirname(CONFIG_PATH);
-  if (!existsSync(dirPath)) {
-    mkdirSync(dirPath, { recursive: true });
-  }
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", "utf-8");
 }
 
@@ -86,11 +87,5 @@ function mergeWithDefaults(parsed: unknown): CqtConfig {
       ? parsed["enabled"]
       : DEFAULT_CONFIG.enabled;
 
-  return {
-    firstTriggerHour,
-    triggerHours,
-    model,
-    randomMinutes,
-    enabled,
-  };
+  return { firstTriggerHour, triggerHours, model, randomMinutes, enabled };
 }

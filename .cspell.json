@@ -30,7 +30,15 @@
     "thresholds",
     "ora",
     "inquirer",
-    "husky"
+    "husky",
+    "linuxbrew",
+    "linuxbrew",
+    "preflight",
+    "logpath",
+    "fileURLToPath",
+    "sibling",
+    "tmpdir",
+    "tmpfile"
   ],
   "ignorePaths": [
     "node_modules",
