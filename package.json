@@ -1,0 +1,70 @@
+{
+  "name": "claude-quota-trigger",
+  "version": "0.1.0",
+  "description": "Auto-trigger Claude quota reset via cron — maximize your Claude Pro 5h windows",
+  "type": "module",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "bin": {
+    "cqt": "dist/cli.js",
+    "cqt-runner": "dist/runner.js"
+  },
+  "main": "./dist/cli.js",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && chmod +x dist/cli.js dist/runner.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/ tests/",
+    "lint:fix": "eslint src/ tests/ --fix",
+    "spell": "cspell \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run lint && npm run spell && npm run test",
+    "prepare": "husky"
+  },
+  "keywords": [
+    "claude",
+    "quota",
+    "trigger",
+    "cron",
+    "automation",
+    "cli"
+  ],
+  "author": "Dong Tran",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dongitran/claude-quota-trigger.git"
+  },
+  "homepage": "https://github.com/dongitran/claude-quota-trigger#readme",
+  "bugs": {
+    "url": "https://github.com/dongitran/claude-quota-trigger/issues"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.5.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
+    "@vitest/coverage-v8": "^4.1.2",
+    "cspell": "^9.7.0",
+    "eslint": "^10.1.0",
+    "husky": "^9.1.7",
+    "jiti": "^2.6.1",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.0",
+    "vitest": "^4.1.2"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.3.2",
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "ora": "^9.3.0"
+  }
+}

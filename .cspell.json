@@ -1,0 +1,43 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "cqt",
+    "crontab",
+    "cron",
+    "cronjob",
+    "haiku",
+    "tseslint",
+    "typecheck",
+    "vitest",
+    "nocheck",
+    "noerror",
+    "promisify",
+    "uninstall",
+    "mínutes",
+    "configdir",
+    "stringify",
+    "randomize",
+    "regenerate",
+    "regen",
+    "stderr",
+    "stdout",
+    "chmod",
+    "mkdir",
+    "execpath",
+    "jiti",
+    "lcov",
+    "thresholds",
+    "ora",
+    "inquirer",
+    "husky"
+  ],
+  "ignorePaths": [
+    "node_modules",
+    "dist",
+    "coverage",
+    ".husky",
+    "package.json",
+    "package-lock.json"
+  ]
+}
