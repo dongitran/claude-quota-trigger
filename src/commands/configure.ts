@@ -58,13 +58,8 @@ export async function runConfigure(): Promise<void> {
   };
 
   saveConfig(updated);
-
-  if (updated.enabled) {
-    installCronJobs(updated);
-    process.stdout.write(chalk.green("\nConfiguration saved and cron jobs updated!\n"));
-  } else {
-    process.stdout.write(chalk.green("\nConfiguration saved.\n"));
-  }
+  installCronJobs(updated);
+  process.stdout.write(chalk.green("\nConfiguration saved and cron jobs updated!\n"));
 
   process.stdout.write("\n  New schedule:\n");
   triggerHours.forEach((hour, idx) => {

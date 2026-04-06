@@ -148,5 +148,5 @@ export const TRIGGER_MESSAGES: readonly string[] = [
  */
 export function getRandomMessage(): string {
   const index = Math.floor(Math.random() * TRIGGER_MESSAGES.length);
-  return TRIGGER_MESSAGES[index] ?? TRIGGER_MESSAGES[0] ?? "hi";
+  return TRIGGER_MESSAGES[index] ?? "hi";
 }

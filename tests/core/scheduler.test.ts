@@ -185,6 +185,31 @@ describe("uninstallCronJobs", () => {
     const calls = mockedExecSync.mock.calls.map((c) => c[0]);
     expect(calls.some((c) => c.includes("crontab -r"))).toBe(true);
   });
+
+  it("writes back remaining non-CQT entries instead of calling crontab -r", async () => {
+    const childProcess = await import("node:child_process");
+    const fs = await import("node:fs");
+    const mockedExecSync = vi.mocked(childProcess.execSync);
+    const mockedWriteFileSync = vi.mocked(fs.writeFileSync);
+
+    // Crontab has a non-CQT job AND our section
+    mockedExecSync.mockImplementationOnce(
+      () =>
+        "# My backup job\n0 * * * * /usr/bin/backup\n# CQT-BEGIN\nPATH=/usr/bin\n# CQT-END\n",
+    );
+
+    const { uninstallCronJobs } = await import("../../src/core/scheduler.js");
+    uninstallCronJobs();
+
+    // Should write remaining entries, not nuke the crontab
+    expect(mockedWriteFileSync).toHaveBeenCalled();
+    const written = mockedWriteFileSync.mock.calls[0]?.[1] as string;
+    expect(written).toContain("/usr/bin/backup");
+    expect(written).not.toContain("CQT-BEGIN");
+
+    const calls = mockedExecSync.mock.calls.map((c) => c[0]);
+    expect(calls.some((c) => c.includes("crontab -r"))).toBe(false);
+  });
 });
 
 describe("stripCqtSection (via installCronJobs)", () => {
@@ -252,5 +277,43 @@ describe("stripCqtSection (via installCronJobs)", () => {
     const written = vi.mocked(fs.writeFileSync).mock.calls[0]?.[1] as string;
     expect(written).toContain("--regenerate");
     expect(written).toMatch(/^0 0 \* \* \*/mu);
+  });
+});
+
+describe("buildCronPath — platform-aware PATH", () => {
+  it("includes Linuxbrew path when platform is linux", async () => {
+    vi.resetModules();
+
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, "platform", {
+      value: "linux",
+      configurable: true,
+    });
+
+    vi.doMock("node:child_process", () => ({ execSync: vi.fn(() => "") }));
+    vi.doMock("node:fs", () => ({
+      existsSync: vi.fn(() => false),
+      writeFileSync: vi.fn(),
+      rmSync: vi.fn(),
+    }));
+
+    try {
+      const { installCronJobs } = await import("../../src/core/scheduler.js");
+      const fs = await import("node:fs");
+      installCronJobs(baseConfig);
+
+      const written = vi.mocked(fs.writeFileSync).mock.calls[0]?.[1] as string;
+      // The PATH= line should use the Linux Homebrew path, not the macOS one
+      const pathLine = written.split("\n").find((l) => l.startsWith("PATH=")) ?? "";
+      expect(pathLine).toContain("linuxbrew");
+      expect(pathLine).not.toContain("/opt/homebrew");
+    } finally {
+      Object.defineProperty(process, "platform", {
+        value: originalPlatform,
+        configurable: true,
+      });
+      vi.doUnmock("node:child_process");
+      vi.doUnmock("node:fs");
+    }
   });
 });
