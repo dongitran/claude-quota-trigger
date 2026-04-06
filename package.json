@@ -19,7 +19,8 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && chmod +x dist/cli.js dist/runner.js",
+    "build": "tsc -p tsconfig.build.json && chmod +x dist/cli.js dist/runner.js dist/postinstall.js",
+    "postinstall": "node dist/postinstall.js || true",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/ tests/",
     "lint:fix": "eslint src/ tests/ --fix",
