@@ -5,7 +5,6 @@
 **Automatically trigger Claude Pro quota resets via cron — maximize your 5-hour usage windows.**
 
 [![npm version](https://img.shields.io/npm/v/claude-quota-trigger?style=flat-square&color=cb3837)](https://www.npmjs.com/package/claude-quota-trigger)
-[![npm downloads](https://img.shields.io/npm/dm/claude-quota-trigger?style=flat-square&color=blue)](https://www.npmjs.com/package/claude-quota-trigger)
 [![CI](https://img.shields.io/github/actions/workflow/status/dongitran/claude-quota-trigger/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/dongitran/claude-quota-trigger/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 [![Node ≥ 20](https://img.shields.io/badge/Node-%3E%3D20-green?style=flat-square)](https://nodejs.org)
