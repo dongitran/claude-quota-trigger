@@ -21,6 +21,7 @@ vi.mock("../../src/core/scheduler.js", () => ({
       { hour: 20, minute: 55 },
     ],
     nextTrigger: { hour: 10, minute: 23 },
+    nextTriggerIsNextDay: false,
   })),
 }));
 
@@ -54,6 +55,7 @@ describe("runStatus", () => {
         { hour: 20, minute: 55 },
       ],
       nextTrigger: { hour: 10, minute: 23 },
+      nextTriggerIsNextDay: false,
     });
   });
 
@@ -73,6 +75,7 @@ describe("runStatus", () => {
       enabled: false,
       entries: [],
       nextTrigger: null,
+      nextTriggerIsNextDay: false,
     } as ScheduleStatus);
     runStatus();
     expect(getScheduleStatus).toHaveBeenCalledWith(disabledConfig);
@@ -83,6 +86,7 @@ describe("runStatus", () => {
       enabled: true,
       entries: [{ hour: 5, minute: 7 }],
       nextTrigger: null,
+      nextTriggerIsNextDay: false,
     } as ScheduleStatus);
     expect(() => { runStatus(); }).not.toThrow();
   });
@@ -92,6 +96,7 @@ describe("runStatus", () => {
       enabled: false,
       entries: [],
       nextTrigger: null,
+      nextTriggerIsNextDay: false,
     } as ScheduleStatus);
     expect(() => { runStatus(); }).not.toThrow();
   });

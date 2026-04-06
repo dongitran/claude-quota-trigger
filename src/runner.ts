@@ -24,8 +24,10 @@ function log(message: string): void {
   try {
     mkdirSync(dirname(LOG_PATH), { recursive: true });
     appendFileSync(LOG_PATH, line, "utf-8");
-  } catch {
-    // Log directory not writable — silently skip
+  } catch (logErr) {
+    process.stderr.write(
+      `[CQT] Warning: could not write log — ${logErr instanceof Error ? logErr.message : String(logErr)}\n`,
+    );
   }
 }
 

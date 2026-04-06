@@ -79,6 +79,82 @@ describe("DEFAULT_CONFIG", () => {
   });
 });
 
+describe("loadConfig — validation of stored config", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("falls back to default firstTriggerHour when stored value is out of range", async () => {
+    const originalHome = process.env["HOME"];
+    const tmpDir = join(tmpdir(), `cqt-val-test-${String(Date.now())}`);
+    mkdirSync(join(tmpDir, ".config", "cqt"), { recursive: true });
+    writeFileSync(
+      join(tmpDir, ".config", "cqt", "config.json"),
+      JSON.stringify({ firstTriggerHour: 99, enabled: true }),
+    );
+    process.env["HOME"] = tmpDir;
+    try {
+      vi.resetModules();
+      const { loadConfig } = await import("../../src/core/config.js");
+      const config = loadConfig();
+      expect(config.firstTriggerHour).toBe(5);
+    } finally {
+      process.env["HOME"] = originalHome;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to default randomMinutes when stored minutes are out of range", async () => {
+    const originalHome = process.env["HOME"];
+    const tmpDir = join(tmpdir(), `cqt-val-test-${String(Date.now())}`);
+    mkdirSync(join(tmpDir, ".config", "cqt"), { recursive: true });
+    writeFileSync(
+      join(tmpDir, ".config", "cqt", "config.json"),
+      JSON.stringify({
+        firstTriggerHour: 5,
+        triggerHours: [5, 10, 15, 20],
+        randomMinutes: [0, 60, 61, 100], // all invalid (must be 1–59)
+        enabled: true,
+      }),
+    );
+    process.env["HOME"] = tmpDir;
+    try {
+      vi.resetModules();
+      const { loadConfig } = await import("../../src/core/config.js");
+      const config = loadConfig();
+      expect(config.randomMinutes).toHaveLength(0); // falls back to DEFAULT_CONFIG
+    } finally {
+      process.env["HOME"] = originalHome;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to default randomMinutes when length mismatches triggerHours", async () => {
+    const originalHome = process.env["HOME"];
+    const tmpDir = join(tmpdir(), `cqt-mismatch-test-${String(Date.now())}`);
+    mkdirSync(join(tmpDir, ".config", "cqt"), { recursive: true });
+    writeFileSync(
+      join(tmpDir, ".config", "cqt", "config.json"),
+      JSON.stringify({
+        firstTriggerHour: 5,
+        triggerHours: [5, 10, 15, 20],
+        randomMinutes: [7, 23], // length 2 != 4
+        enabled: true,
+      }),
+    );
+    process.env["HOME"] = tmpDir;
+    try {
+      vi.resetModules();
+      const { loadConfig } = await import("../../src/core/config.js");
+      const config = loadConfig();
+      expect(config.randomMinutes).toHaveLength(0);
+    } finally {
+      process.env["HOME"] = originalHome;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("loadConfig / saveConfig (filesystem integration)", () => {
   const tmpDir = join(tmpdir(), `cqt-test-${String(Date.now())}`);
   const configPath = join(tmpDir, "config.json");

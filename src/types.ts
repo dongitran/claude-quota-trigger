@@ -15,6 +15,8 @@ export interface ScheduleStatus {
   readonly enabled: boolean;
   readonly entries: readonly TriggerEntry[];
   readonly nextTrigger: TriggerEntry | null;
+  /** True when all today's triggers have passed and nextTrigger refers to tomorrow's first slot. */
+  readonly nextTriggerIsNextDay: boolean;
 }
 
 export const DEFAULT_CONFIG: CqtConfig = {

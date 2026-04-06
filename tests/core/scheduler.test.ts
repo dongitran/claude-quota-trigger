@@ -76,6 +76,37 @@ describe("getScheduleStatus", () => {
     // Wraps to entries[0] when none are in the future
     expect(status.nextTrigger).not.toBeNull();
   });
+
+  it("nextTriggerIsNextDay is true when all triggers have passed", () => {
+    const config: CqtConfig = {
+      ...baseConfig,
+      triggerHours: [0, 1, 2, 3],
+      randomMinutes: [1, 1, 1, 1],
+    };
+    const status = getScheduleStatus(config);
+    expect(status.nextTriggerIsNextDay).toBe(true);
+  });
+
+  it("nextTriggerIsNextDay is false when a future trigger exists today", () => {
+    // Use a config with triggers far in the future (hour 23) to guarantee one is upcoming
+    const config: CqtConfig = {
+      ...baseConfig,
+      triggerHours: [23, 0, 1, 2],
+      randomMinutes: [59, 1, 1, 1],
+    };
+    const now = new Date();
+    // Only run assertion if current hour is before 23
+    if (now.getHours() < 23) {
+      const status = getScheduleStatus(config);
+      expect(status.nextTriggerIsNextDay).toBe(false);
+    }
+  });
+
+  it("nextTriggerIsNextDay is false when disabled", () => {
+    const config: CqtConfig = { ...baseConfig, enabled: false };
+    const status = getScheduleStatus(config);
+    expect(status.nextTriggerIsNextDay).toBe(false);
+  });
 });
 
 describe("installCronJobs", () => {
@@ -138,5 +169,88 @@ describe("uninstallCronJobs", () => {
     uninstallCronJobs();
 
     expect(mockedExecSync).toHaveBeenCalled();
+  });
+
+  it("calls crontab -r when no entries remain after stripping", async () => {
+    const childProcess = await import("node:child_process");
+    const mockedExecSync = vi.mocked(childProcess.execSync);
+    // Return a crontab that is ONLY CQT section
+    mockedExecSync.mockImplementationOnce(() =>
+      "# CQT-BEGIN\nPATH=/usr/bin\n7 5 * * * node runner.js\n# CQT-END\n",
+    );
+
+    const { uninstallCronJobs } = await import("../../src/core/scheduler.js");
+    uninstallCronJobs();
+
+    const calls = mockedExecSync.mock.calls.map((c) => c[0]);
+    expect(calls.some((c) => c.includes("crontab -r"))).toBe(true);
+  });
+});
+
+describe("stripCqtSection (via installCronJobs)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("removes existing CQT section so there is exactly one after reinstall", async () => {
+    const childProcess = await import("node:child_process");
+    const fs = await import("node:fs");
+    const mockedExecSync = vi.mocked(childProcess.execSync);
+    const mockedWriteFileSync = vi.mocked(fs.writeFileSync);
+
+    mockedExecSync.mockImplementationOnce(
+      () => "# CQT-BEGIN\nPATH=/usr/bin\n# CQT-END\n",
+    );
+
+    const { installCronJobs } = await import("../../src/core/scheduler.js");
+    installCronJobs(baseConfig);
+
+    const written = mockedWriteFileSync.mock.calls[0]?.[1] as string;
+    const beginCount = (written.match(/# CQT-BEGIN/gu) ?? []).length;
+    expect(beginCount).toBe(1);
+  });
+
+  it("preserves non-CQT crontab entries", async () => {
+    const childProcess = await import("node:child_process");
+    const fs = await import("node:fs");
+    const mockedExecSync = vi.mocked(childProcess.execSync);
+    const mockedWriteFileSync = vi.mocked(fs.writeFileSync);
+
+    mockedExecSync.mockImplementationOnce(
+      () =>
+        "# My backup job\n0 * * * * /usr/bin/backup\n# CQT-BEGIN\nPATH=/usr/bin\n# CQT-END\n",
+    );
+
+    const { installCronJobs } = await import("../../src/core/scheduler.js");
+    installCronJobs(baseConfig);
+
+    const written = mockedWriteFileSync.mock.calls[0]?.[1] as string;
+    expect(written).toContain("/usr/bin/backup");
+  });
+
+  it("generates cron entries with quoted node and runner paths", async () => {
+    const childProcess = await import("node:child_process");
+    const fs = await import("node:fs");
+    vi.mocked(childProcess.execSync).mockImplementationOnce(() => "");
+
+    const { installCronJobs } = await import("../../src/core/scheduler.js");
+    installCronJobs(baseConfig);
+
+    const written = vi.mocked(fs.writeFileSync).mock.calls[0]?.[1] as string;
+    // Each trigger line must quote both the node and runner paths
+    expect(written).toMatch(/"[^"]+"\s+"[^"]+"/u);
+  });
+
+  it("includes midnight regeneration job in cron section", async () => {
+    const childProcess = await import("node:child_process");
+    const fs = await import("node:fs");
+    vi.mocked(childProcess.execSync).mockImplementationOnce(() => "");
+
+    const { installCronJobs } = await import("../../src/core/scheduler.js");
+    installCronJobs(baseConfig);
+
+    const written = vi.mocked(fs.writeFileSync).mock.calls[0]?.[1] as string;
+    expect(written).toContain("--regenerate");
+    expect(written).toMatch(/^0 0 \* \* \*/mu);
   });
 });

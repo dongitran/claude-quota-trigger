@@ -43,7 +43,8 @@ export function runStatus(): void {
   if (status.nextTrigger !== null) {
     const { hour, minute } = status.nextTrigger;
     const next = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-    process.stdout.write(`\n  Next trigger: ${chalk.yellow(next)}\n`);
+    const dayLabel = status.nextTriggerIsNextDay ? chalk.dim(" (tomorrow)") : "";
+    process.stdout.write(`\n  Next trigger: ${chalk.yellow(next)}${dayLabel}\n`);
   }
 
   process.stdout.write("\n");

@@ -61,26 +61,42 @@ function isNumberArray(value: unknown): value is number[] {
   );
 }
 
+function isValidHour(h: number): boolean {
+  return Number.isInteger(h) && h >= 0 && h <= 23;
+}
+
+function isValidMinute(m: number): boolean {
+  return Number.isInteger(m) && m >= 1 && m <= 59;
+}
+
 function mergeWithDefaults(parsed: unknown): CqtConfig {
   if (!isRecord(parsed)) {
     return DEFAULT_CONFIG;
   }
 
+  const rawFirstHour = parsed["firstTriggerHour"];
   const firstTriggerHour =
-    typeof parsed["firstTriggerHour"] === "number"
-      ? parsed["firstTriggerHour"]
+    typeof rawFirstHour === "number" && isValidHour(rawFirstHour)
+      ? rawFirstHour
       : DEFAULT_CONFIG.firstTriggerHour;
 
-  const triggerHours = isNumberArray(parsed["triggerHours"])
-    ? (parsed["triggerHours"] as readonly number[])
-    : buildTriggerHours(firstTriggerHour);
+  const rawTriggerHours = parsed["triggerHours"];
+  const triggerHours =
+    isNumberArray(rawTriggerHours) &&
+    (rawTriggerHours).every(isValidHour)
+      ? (rawTriggerHours as readonly number[])
+      : buildTriggerHours(firstTriggerHour);
 
   const model =
     typeof parsed["model"] === "string" ? parsed["model"] : DEFAULT_CONFIG.model;
 
-  const randomMinutes = isNumberArray(parsed["randomMinutes"])
-    ? (parsed["randomMinutes"] as readonly number[])
-    : DEFAULT_CONFIG.randomMinutes;
+  const rawMinutes = parsed["randomMinutes"];
+  const randomMinutes =
+    isNumberArray(rawMinutes) &&
+    (rawMinutes).every(isValidMinute) &&
+    (rawMinutes).length === triggerHours.length
+      ? (rawMinutes as readonly number[])
+      : DEFAULT_CONFIG.randomMinutes;
 
   const enabled =
     typeof parsed["enabled"] === "boolean"

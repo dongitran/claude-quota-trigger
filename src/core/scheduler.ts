@@ -42,7 +42,7 @@ function readCurrentCrontab(): string {
  * Never use `echo "..." | crontab -` — shell escaping is fragile.
  */
 function writeCurrentCrontab(content: string): void {
-  const tmpFile = join(tmpdir(), `cqt-crontab-${String(Date.now())}.tmp`);
+  const tmpFile = join(tmpdir(), `cqt-crontab-${String(Date.now())}-${Math.random().toString(36).slice(2)}.tmp`);
   try {
     writeFileSync(tmpFile, content, "utf-8");
     execSync(`crontab ${tmpFile}`, { encoding: "utf-8" });
@@ -95,11 +95,11 @@ function buildCronSection(config: CqtConfig): string {
 
   const triggerLines = config.triggerHours.map((hour, idx) => {
     const minute = config.randomMinutes[idx] ?? 1;
-    return `${String(minute)} ${String(hour)} * * * ${nodeBin} ${runnerBin} 2>/dev/null`;
+    return `${String(minute)} ${String(hour)} * * * "${nodeBin}" "${runnerBin}" 2>/dev/null`;
   });
 
   // Midnight job regenerates random minutes daily
-  const regenLine = `0 0 * * * ${nodeBin} ${runnerBin} --regenerate 2>/dev/null`;
+  const regenLine = `0 0 * * * "${nodeBin}" "${runnerBin}" --regenerate 2>/dev/null`;
 
   return [CRON_MARKER_BEGIN, pathLine, ...triggerLines, regenLine, CRON_MARKER_END].join("\n");
 }
@@ -134,7 +134,7 @@ export function uninstallCronJobs(): void {
 
 export function getScheduleStatus(config: CqtConfig): ScheduleStatus {
   if (!config.enabled || config.randomMinutes.length === 0) {
-    return { enabled: false, entries: [], nextTrigger: null };
+    return { enabled: false, entries: [], nextTrigger: null, nextTriggerIsNextDay: false };
   }
 
   const entries: TriggerEntry[] = config.triggerHours.map((hour, idx) => ({
@@ -146,12 +146,14 @@ export function getScheduleStatus(config: CqtConfig): ScheduleStatus {
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
 
-  const nextTrigger =
-    entries.find((e) => {
-      if (e.hour > currentHour) return true;
-      if (e.hour === currentHour && e.minute > currentMinute) return true;
-      return false;
-    }) ?? entries[0] ?? null;
+  const foundTrigger = entries.find((e) => {
+    if (e.hour > currentHour) return true;
+    if (e.hour === currentHour && e.minute > currentMinute) return true;
+    return false;
+  });
 
-  return { enabled: config.enabled, entries, nextTrigger };
+  const nextTrigger = foundTrigger ?? entries[0] ?? null;
+  const nextTriggerIsNextDay = foundTrigger === undefined && entries.length > 0;
+
+  return { enabled: config.enabled, entries, nextTrigger, nextTriggerIsNextDay };
 }
