@@ -10,7 +10,16 @@ import { CRON_MARKER_BEGIN, CRON_MARKER_END } from "../types.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const NODE_CANDIDATES = [
+  "/opt/homebrew/bin/node",
+  "/usr/local/bin/node",
+  "/usr/bin/node",
+] as const;
+
 function getNodeBin(): string {
+  for (const candidate of NODE_CANDIDATES) {
+    if (existsSync(candidate)) return candidate;
+  }
   return process.execPath;
 }
 

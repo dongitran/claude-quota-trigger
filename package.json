@@ -1,6 +1,6 @@
 {
   "name": "claude-quota-trigger",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Auto-trigger Claude quota reset via cron — maximize your Claude Pro 5h windows",
   "type": "module",
   "publishConfig": {
