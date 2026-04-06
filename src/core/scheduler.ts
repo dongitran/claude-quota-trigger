@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { accessSync, constants, existsSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,36 +9,6 @@ import { CRON_MARKER_BEGIN, CRON_MARKER_END } from "../types.js";
 // Node 20-compatible __dirname (import.meta.dirname is Node 21.2+)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-function isExecutable(p: string): boolean {
-  try {
-    accessSync(p, constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function getNodeBin(): string {
-  const home = homedir();
-  const candidates = [
-    // Stable symlinks — Homebrew updates these on upgrade
-    "/opt/homebrew/bin/node",  // Homebrew ARM macOS (Apple Silicon)
-    "/usr/local/bin/node",     // Homebrew Intel macOS / system
-    "/usr/bin/node",           // system Linux
-    // Version manager shims — stable across Node upgrades
-    `${home}/.volta/bin/node`,                    // volta
-    `${home}/.asdf/shims/node`,                   // asdf
-    `${home}/.fnm/aliases/default/bin/node`,      // fnm (requires `fnm default <version>`)
-  ];
-
-  for (const candidate of candidates) {
-    if (isExecutable(candidate)) return candidate;
-  }
-
-  // Last resort: current process binary — breaks after Node upgrade (e.g. nvm users)
-  return process.execPath;
-}
 
 /**
  * Resolves path to the cqt-runner script.
@@ -104,28 +74,50 @@ function stripCqtSection(crontab: string): string {
 /**
  * Builds a platform-aware PATH string for the cron environment.
  * Cron runs with a minimal PATH — we must supply what we need.
+ *
+ * Version manager bin dirs (volta, asdf, fnm) are included when present so that
+ * `/usr/bin/env node` in cron entries resolves correctly without baking an
+ * install-time absolute path into the crontab.
  */
 function buildCronPath(): string {
+  const home = homedir();
+
+  // Include version manager shim dirs if they exist on this machine.
+  // Expanded to absolute paths because cron does not expand `~`.
+  const versionManagerDirs = [
+    `${home}/.volta/bin`,               // volta
+    `${home}/.asdf/shims`,              // asdf
+    `${home}/.fnm/aliases/default/bin`, // fnm (requires `fnm default <version>`)
+  ].filter(existsSync);
+
   const base = ["/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"];
+
   if (process.platform === "darwin") {
-    return ["/opt/homebrew/bin", "/opt/homebrew/sbin", ...base].join(":");
+    return ["/opt/homebrew/bin", "/opt/homebrew/sbin", ...versionManagerDirs, ...base].join(":");
   }
-  // Linux (also handles Linuxbrew)
-  return ["/home/linuxbrew/.linuxbrew/bin", ...base].join(":");
+  // Linux — includes Linuxbrew (WSL + native)
+  return ["/home/linuxbrew/.linuxbrew/bin", ...versionManagerDirs, ...base].join(":");
 }
 
+/**
+ * Builds the CQT cron section.
+ *
+ * Uses `/usr/bin/env node` instead of a hardcoded absolute binary path so that
+ * node is resolved at runtime via the PATH line above each job. This means cron
+ * keeps working after `brew upgrade node` or a version-manager switch without
+ * requiring `cqt setup` to be re-run.
+ */
 function buildCronSection(config: CqtConfig): string {
-  const nodeBin = getNodeBin();
   const runnerBin = getCqtRunnerBin();
   const pathLine = `PATH=${buildCronPath()}`;
 
   const triggerLines = config.triggerHours.map((hour, idx) => {
     const minute = config.randomMinutes[idx] ?? 1;
-    return `${String(minute)} ${String(hour)} * * * "${nodeBin}" "${runnerBin}" 2>/dev/null`;
+    return `${String(minute)} ${String(hour)} * * * /usr/bin/env node "${runnerBin}" 2>/dev/null`;
   });
 
   // Midnight job regenerates random minutes daily
-  const regenLine = `0 0 * * * "${nodeBin}" "${runnerBin}" --regenerate 2>/dev/null`;
+  const regenLine = `0 0 * * * /usr/bin/env node "${runnerBin}" --regenerate 2>/dev/null`;
 
   return [CRON_MARKER_BEGIN, pathLine, ...triggerLines, regenLine, CRON_MARKER_END].join("\n");
 }

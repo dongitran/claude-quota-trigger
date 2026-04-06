@@ -253,7 +253,7 @@ describe("stripCqtSection (via installCronJobs)", () => {
     expect(written).toContain("/usr/bin/backup");
   });
 
-  it("generates cron entries with quoted node and runner paths", async () => {
+  it("generates cron entries using /usr/bin/env node with quoted runner path", async () => {
     const childProcess = await import("node:child_process");
     const fs = await import("node:fs");
     vi.mocked(childProcess.execSync).mockImplementationOnce(() => "");
@@ -262,8 +262,10 @@ describe("stripCqtSection (via installCronJobs)", () => {
     installCronJobs(baseConfig);
 
     const written = vi.mocked(fs.writeFileSync).mock.calls[0]?.[1] as string;
-    // Each trigger line must quote both the node and runner paths
-    expect(written).toMatch(/"[^"]+"\s+"[^"]+"/u);
+    // Each trigger line must use /usr/bin/env node with a quoted runner path
+    expect(written).toMatch(/\/usr\/bin\/env node\s+"[^"]+"/u);
+    // Must NOT bake an absolute node binary path (versioned paths break on upgrade)
+    expect(written).not.toMatch(/"\/.+\/node"\s+"/u);
   });
 
   it("includes midnight regeneration job in cron section", async () => {
@@ -312,6 +314,36 @@ describe("buildCronPath — platform-aware PATH", () => {
         value: originalPlatform,
         configurable: true,
       });
+      vi.doUnmock("node:child_process");
+      vi.doUnmock("node:fs");
+    }
+  });
+
+  it("includes version manager dirs in PATH when they exist", async () => {
+    vi.resetModules();
+
+    vi.doMock("node:child_process", () => ({ execSync: vi.fn(() => "") }));
+    vi.doMock("node:fs", () => ({
+      // Simulate volta and asdf present, fnm absent
+      existsSync: vi.fn((p: string) => {
+        if (typeof p === "string" && (p.includes("/.volta/bin") || p.includes("/.asdf/shims"))) return true;
+        return false;
+      }),
+      writeFileSync: vi.fn(),
+      rmSync: vi.fn(),
+    }));
+
+    try {
+      const { installCronJobs } = await import("../../src/core/scheduler.js");
+      const fs = await import("node:fs");
+      installCronJobs(baseConfig);
+
+      const written = vi.mocked(fs.writeFileSync).mock.calls[0]?.[1] as string;
+      const pathLine = written.split("\n").find((l) => l.startsWith("PATH=")) ?? "";
+      expect(pathLine).toContain(".volta/bin");
+      expect(pathLine).toContain(".asdf/shims");
+      expect(pathLine).not.toContain(".fnm");
+    } finally {
       vi.doUnmock("node:child_process");
       vi.doUnmock("node:fs");
     }
