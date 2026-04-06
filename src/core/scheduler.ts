@@ -1,6 +1,6 @@
 import { execSync } from "node:child_process";
-import { existsSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { accessSync, constants, existsSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CqtConfig, ScheduleStatus, TriggerEntry } from "../types.js";
@@ -10,16 +10,33 @@ import { CRON_MARKER_BEGIN, CRON_MARKER_END } from "../types.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const NODE_CANDIDATES = [
-  "/opt/homebrew/bin/node",
-  "/usr/local/bin/node",
-  "/usr/bin/node",
-] as const;
+function isExecutable(p: string): boolean {
+  try {
+    accessSync(p, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function getNodeBin(): string {
-  for (const candidate of NODE_CANDIDATES) {
-    if (existsSync(candidate)) return candidate;
+  const home = homedir();
+  const candidates = [
+    // Stable symlinks — Homebrew updates these on upgrade
+    "/opt/homebrew/bin/node",  // Homebrew ARM macOS (Apple Silicon)
+    "/usr/local/bin/node",     // Homebrew Intel macOS / system
+    "/usr/bin/node",           // system Linux
+    // Version manager shims — stable across Node upgrades
+    `${home}/.volta/bin/node`,                    // volta
+    `${home}/.asdf/shims/node`,                   // asdf
+    `${home}/.fnm/aliases/default/bin/node`,      // fnm (requires `fnm default <version>`)
+  ];
+
+  for (const candidate of candidates) {
+    if (isExecutable(candidate)) return candidate;
   }
+
+  // Last resort: current process binary — breaks after Node upgrade (e.g. nvm users)
   return process.execPath;
 }
 
